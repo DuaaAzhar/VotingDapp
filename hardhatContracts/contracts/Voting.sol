@@ -1,35 +1,49 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.21;
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Voting {
+contract Voting is Ownable{
     struct Candidate{
         string name;
         uint votes;
     }
     Candidate[] public candidates;
     mapping (address => bool) public voters;
-    address owner;
     uint public votingStart;
     uint public  votingEnd;
 
-    constructor(string[] memory _candidateNames, uint _durationInMinutes) {
-        for( uint i=0; i < _candidateNames.length; i++){
-            candidates.push(
+    constructor(string[] memory _candidateNames, uint _durationInMinutes) Ownable(msg.sender){
+      for( uint i=0; i < _candidateNames.length; i++){
+             candidates.push(
                 Candidate({
                     name: _candidateNames[i],
                     votes: 0
                 })
             );
         }
-        owner = msg.sender;
         votingStart = block.timestamp;
         votingEnd = block.timestamp + (_durationInMinutes * 1 minutes);
     }
-    modifier onlyOwner {
-        require(msg.sender == owner);
-        _;
+    
+
+    function initVoting(string[] memory _candidateNames, uint _durationInMinutes)public onlyOwner{
+      require(getVotingStatus()== false, "Previous voting has not yet ended");
+      if(candidates.length > 0){
+        delete candidates;
+      }
+      for( uint i=0; i < _candidateNames.length; i++){
+             candidates.push(
+                Candidate({
+                    name: _candidateNames[i],
+                    votes: 0
+                })
+            );
+        }
+        votingStart = block.timestamp;
+        votingEnd = block.timestamp + (_durationInMinutes * 1 minutes);
     }
     function addCandidate(string memory _name) public onlyOwner{
+        require(getVotingStatus(), "voting not intialized");
         candidates.push(Candidate({
             name: _name,
             votes: 0
@@ -46,10 +60,13 @@ contract Voting {
         return candidates;
     }
     function getVotingStatus() public view returns (bool) {
-        return (block.timestamp >= votingStart && block.timestamp <= votingEnd);
+        return (block.timestamp >= votingStart && block.timestamp < votingEnd);
     }
     function getRemainingTime() public view returns(uint){
-        require(getVotingStatus(), "Voting is disabled");
+        require(getVotingStatus(), "Voting not active");
+         if (block.timestamp >= votingEnd) {
+            return 0;
+            }
         return votingEnd - block.timestamp;
     }
 
